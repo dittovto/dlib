@@ -783,3 +783,5 @@ if (NOT TARGET dlib)
 endif()
 
 add_library(dlib::dlib ALIAS dlib)
+
+include(CPack)
