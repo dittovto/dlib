@@ -784,5 +784,5 @@ endif()
 
 add_library(dlib::dlib ALIAS dlib)
 # This is hardcoded inside dlib's Cmake file
-set(CMAKE_INSTALL_PREFIX "/usr/local")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "/usr/local")
 include(CPack)
