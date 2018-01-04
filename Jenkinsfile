@@ -1,23 +1,52 @@
 // Pipeline definition for the build steps of AR.
 //
 // Copyright: 2017 Ditto Technologies. All Rights Reserved.
-// Author: Frankie Li
+// Author: Frankie Li, Daran He, John Inacay
 // TODO - Need to migrate to a standardize Debian package deployment script.
 
 
+build_configs = [
+    'ubuntu_16_04' : [
+        'docker_name' : 'ubuntu16-build-env',
+        'docker_file' : 'Dockerfile.xenial',
+        'repo'        : '3rdparty-16.04',
+        'staging_repo': '3rdparty-16.04-staging',
+        'dist'        : 'xenial',
+    ],
+    'ubuntu_14_04' : [
+        'docker_name' : 'ubuntu14-build-env',
+        'docker_file' : 'Dockerfile.trusty',
+        'repo'        : '3rdparty-14.04',
+        'staging_repo': '3rdparty-14.04-staging',
+        'dist'        : 'trusty',
+    ]
+]
+
+
 node('build && docker') {
-
-    def is_rc = false
-    def is_release = false
-
     // Set max number of builds to keep to 5.
     properties([[$class: 'BuildDiscarderProperty', strategy: [$class: 'LogRotator', artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5']]]);
 
-    stage('Checkout') {
+    build_configs.each { target, build_config ->
+        git_info = checkoutRepo(target)
+
+        build(target, build_config)
+
+        publish(target, build_config, git_info)
+
+        cleanUp(target)
+    }
+}
+
+def checkoutRepo(target) {
+    def is_rc = false
+    def is_release = false
+
+    stage("Checkout ${target}") {
         // Pull the code from the repo. `checkout` is a special Jenkins cmd.
         def scm_vars = checkout scm
-        def git_tag = getGitTag()
-        def git_branch = getGitBranch()
+        git_tag = getGitTag()
+        git_branch = getGitBranch()
 
         if(git_tag) {
             is_rc = (git_tag.indexOf("-rc") >= 0)
@@ -28,32 +57,44 @@ node('build && docker') {
         echo "Current tag is a Release tag: ${is_release}"
     }
 
-    stage('Prepare build env') {
+    git_info = [
+        'is_release': is_release,
+        'is_rc': is_rc,
+    ]
+
+    return git_info
+}
+
+def build(target, build_config) {
+    stage("Prepare Build Env ${target}") {
         // We're checking to see if an old image exists. If so, delete it to
         // reduce total space usage.
+        def docker_name = build_config.docker_name
+        def docker_file = build_config.docker_file
 
-        def OLD_IMAGE = sh (script: 'docker images -q ubuntu16-build-env',
-                            returnStdout: true)
-        echo "Old docker image: ${OLD_IMAGE}"
 
-        docker.build("ubuntu16-build-env", "-f Dockerfile.xenial .")
+        def old_image = sh (script: "docker images -q ${build_config.docker_name}",
+                            returnStdout: true).replace("\n", " ")
+        echo "Old docker image: ${old_image}"
 
-        def NEW_IMAGE = sh (script: 'docker images -q ubuntu16-build-env',
-                            returnStdout: true)
+        docker.build("${build_config.docker_name}", "-f ${build_config.docker_file} .")
 
-        echo "New docker image: ${NEW_IMAGE}"
+        def new_image = sh (script: "docker images -q ${build_config.docker_name}",
+                            returnStdout: true).replace("\n", " ")
 
-        if (OLD_IMAGE.length() > 0 && OLD_IMAGE != NEW_IMAGE) {
-            def children = sh(script: "docker images --filter 'dangling=true' -q --no-trunc", returnStdout: true)
+        echo "New docker image: ${new_image}"
+
+        if (old_image.length() > 0 && old_image != new_image) {
+            def children = sh(script: "docker images --filter 'dangling=true' -q --no-trunc",
+                              returnStdout: true).replace("\n", " ").replace(" ", "")
             echo "Removing children: ${children}"
             sh("docker rmi ${children}")
-            echo "Removing old image: ${OLD_IMAGE}"
-            sh("docker rmi ${OLD_IMAGE}")
+            echo "Removing old image: ${old_image}"
+            sh("docker rmi ${old_image}")
         }
     }
 
-    stage('Build') {
-
+    stage("Build ${target}") {
         def USER_ID = sh (
             script: 'id -u',
             returnStdout: true
@@ -68,23 +109,33 @@ node('build && docker') {
                  'RELEASE_KEY_ALIAS=demoapp',
                  'RELEASE_STORE_PASSWORD=ditto1',
                  'RELEASE_KEY_PASSWORD=ditto1']) {
-            docker.image('ubuntu16-build-env').inside {
+            docker.image("${build_config.docker_name}").inside {
                 sh('./run_build.sh')
             }
         }
     }
 
-    stage('ArchiveArtifacts') {
+    stage("ArchiveArtifacts ${target}") {
         archiveArtifacts(artifacts: 'build/*.deb')
     }
+}
 
-    stage('Publish') {
+def publish(target, build_config, git_info) {
+    stage("Publish ${target}") {
+        def repo = git_info.is_release ? build_config.repo : build_config.staging_repo
+
         withAWS(credentials:'package-uploads') {
-            sh('./publish_xenial.sh')
+            sh("./publish.sh ${repo} ${build_config.dist}")
         }
-	
     }
+}
 
+def cleanUp(target) {
+    stage("CleanUp ${target}") {
+        def current_dir = pwd()
+        echo "Cleaning up ${current_dir}"
+        deleteDir()
+    }
 }
 
 def getGitHash() {
