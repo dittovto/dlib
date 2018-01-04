@@ -39,6 +39,9 @@ node('build && docker') {
 }
 
 def checkoutRepo(target) {
+    def is_rc = false
+    def is_release = false
+
     stage("Checkout ${target}") {
         // Pull the code from the repo. `checkout` is a special Jenkins cmd.
         def scm_vars = checkout scm
@@ -83,7 +86,7 @@ def build(target, build_config) {
 
         if (old_image.length() > 0 && old_image != new_image) {
             def children = sh(script: "docker images --filter 'dangling=true' -q --no-trunc",
-                              returnStdout: true).replace("\n", " ")
+                              returnStdout: true).replace("\n", " ").replace(" ", "")
             echo "Removing children: ${children}"
             sh("docker rmi ${children}")
             echo "Removing old image: ${old_image}"
