@@ -18,7 +18,7 @@ RUN apt-get install -y wget
 RUN apt-get install -y libgflags-dev libprotobuf-dev protobuf-compiler
 
 # For some reason, libxmu-dev is not included by the latest freeglut3...
-RUN apt-get install -y libglew-dev libglfw3-dev freeglut3-dev libxmu-dev
+RUN apt-get update -qq && apt-get install -y libglew-dev libglfw3-dev freeglut3-dev libxmu-dev
 
 # Ceres dependencies.
 RUN apt-get install -y libgoogle-glog-dev
