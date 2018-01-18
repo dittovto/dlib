@@ -10,9 +10,10 @@ mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 cmake ../dlib \
 	-DCMAKE_BUILD_TYPE=Release \
+	-DCPACK_PACKAGING_INSTALL_PREFIX="/usr/local" \
 	-DCPACK_GENERATOR="DEB" \
 	-DCPACK_BINARY_DEB="ON" \
 	-DCPACK_DEBIAN_PACKAGE_SHLIBDEPS="ON" \
 	-DCPACK_PACKAGE_CONTACT="eng@ditto.com"
 
-make -j$(nproc) package
+make -j$(nproc)
