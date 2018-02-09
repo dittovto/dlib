@@ -338,6 +338,15 @@ namespace dlib
         image_type2& out_img,
         double angle
     );
+    template <
+        typename image_type1,
+        typename image_type2
+        >
+    point_transform_affine rotate_image_inplace (
+        const image_type1& in_img,
+        image_type2& out_img,
+        double angle
+    );
     /*!
         requires
             - image_type1 == an image object that implements the interface defined in
@@ -354,6 +363,7 @@ namespace dlib
             - returns a transformation object that maps points in in_img into their corresponding 
               location in #out_img.
     !*/
+
 
 // ----------------------------------------------------------------------------------------
 

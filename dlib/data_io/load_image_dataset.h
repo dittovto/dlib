@@ -17,7 +17,8 @@
 #include <utility>
 #include <limits>
 #include "../image_transforms/image_pyramid.h"
-
+#include "../geometry/rectangle.h"
+#include <random>
 
 namespace dlib
 {
@@ -152,7 +153,7 @@ namespace dlib
             if (!source.should_skip_empty_images() || rects.size() != 0)
             {
                 load_image(img, data.images[i].filename);
-                if (rects.size() != 0)  
+                if (rects.size() != 0)
                 {
                     // if shrinking the image would still result in the smallest box being
                     // bigger than the box area threshold then shrink the image.
@@ -238,7 +239,7 @@ namespace dlib
             if (!source.should_skip_empty_images() || rects.size() != 0)
             {
                 load_image(img, data.images[i].filename);
-                if (rects.size() != 0)  
+                if (rects.size() != 0)
                 {
                     // if shrinking the image would still result in the smallest box being
                     // bigger than the box area threshold then shrink the image.
@@ -269,7 +270,7 @@ namespace dlib
 
 // ******* THIS FUNCTION IS DEPRECATED, you should use another version of load_image_dataset() *******
     template <
-        typename image_type, 
+        typename image_type,
         typename MM
         >
     std::vector<std::vector<rectangle> > load_image_dataset (
@@ -320,6 +321,24 @@ namespace dlib
 // ----------------------------------------------------------------------------------------
 // ----------------------------------------------------------------------------------------
 
+    void rotate_point(const point& ctr,float angle, point& p)
+    {
+      float s = std::sin(angle);
+      float c = std::cos(angle);
+
+      // translate point back to origin:
+      p.x() -= ctr.x();
+      p.y() -= ctr.y();
+
+      // rotate point
+      float xnew = p.x() * c - p.y() * s;
+      float ynew = p.x() * s + p.y() * c;
+
+      // translate point back:
+      p.x() = xnew + ctr.x();
+      p.y() = ynew + ctr.y();
+    }
+
     template <
         typename array_type
         >
@@ -327,13 +346,40 @@ namespace dlib
         array_type& images,
         std::vector<std::vector<full_object_detection> >& object_locations,
         const image_dataset_file& source,
-        std::vector<std::string>& parts_list
+        std::vector<std::string>& parts_list,
+        const std::vector<double>& augment_rotations
     )
     {
+        std::cout << "Entering load_image_dataset" << std::endl;
         typedef typename array_type::value_type image_type;
         parts_list.clear();
         images.clear();
         object_locations.clear();
+        assert(augment_rotations.size() == 2 || augment_rotations.size() == 0);
+        int aug_num_samples = 0;
+        double aug_max_angle = 0;
+        std::vector<double> aug_rotation_angles;
+        if (augment_rotations.size()) {
+            aug_num_samples = int(augment_rotations[0]);
+            aug_max_angle = augment_rotations[1] * 3.141592657 / 180.;
+            aug_rotation_angles = std::vector<double>(aug_num_samples * 2, 0);
+        }
+
+        if (aug_num_samples) {
+            double slice_angle = aug_max_angle / aug_num_samples;
+            for (size_t slice_idx = 0; slice_idx < aug_num_samples; ++slice_idx ) {
+                aug_rotation_angles[slice_idx] = -slice_angle * (aug_num_samples - slice_idx);
+            }
+            for (size_t slice_idx = 0; slice_idx < aug_num_samples; ++slice_idx ) {
+                aug_rotation_angles[aug_num_samples + slice_idx] = slice_angle * (slice_idx + 1);
+            }
+            std::cout << "Sampling Angles: ";
+            for ( const auto & angle : aug_rotation_angles ) {
+                std::cout << angle * 180. / 3.141592657 << ", ";
+            }
+            std::cout << std::endl;
+        }
+
 
         using namespace dlib::image_dataset_metadata;
         dataset data;
@@ -375,13 +421,17 @@ namespace dlib
 
         std::vector<std::vector<rectangle> > ignored_rects;
         std::vector<rectangle> ignored;
-        image_type img;
+        image_type img, original_img, rotated_image;
+        image_type template_img;
         std::vector<full_object_detection> object_dets;
+        load_image(template_img, data.images[0].filename);
+
         for (unsigned long i = 0; i < data.images.size(); ++i)
         {
             double min_rect_size = std::numeric_limits<double>::infinity();
             object_dets.clear();
             ignored.clear();
+            assert(data.images[i].boxes.size() == 1);
             for (unsigned long j = 0; j < data.images[i].boxes.size(); ++j)
             {
                 if (source.should_load_box(data.images[i].boxes[j]))
@@ -402,8 +452,27 @@ namespace dlib
                             partlist[parts_idx[itr->first]] = itr->second;
                         }
 
+                        object_dets.clear();
                         object_dets.push_back(full_object_detection(data.images[i].boxes[j].rect, partlist));
                         min_rect_size = std::min<double>(min_rect_size, object_dets.back().get_rect().area());
+                        object_locations.push_back(object_dets);
+
+
+                        if (aug_rotation_angles.size()) {
+                            const auto& rect = data.images[i].boxes[j].rect;
+                            point ctr = dcenter(get_rect(template_img));
+                            for (const auto & angle : aug_rotation_angles) {
+                                object_dets.clear();
+                                std::vector<point> new_partlist(partlist);
+
+                                for (itr = parts.begin(); itr != parts.end(); ++itr)
+                                {
+                                    rotate_point(ctr, angle, new_partlist[parts_idx[itr->first]]);
+                                }
+                                object_dets.push_back(full_object_detection(rect, new_partlist));
+                                object_locations.push_back(object_dets);
+                            }
+                        }
                     }
                 }
             }
@@ -411,8 +480,10 @@ namespace dlib
             if (!source.should_skip_empty_images() || object_dets.size() != 0)
             {
                 load_image(img, data.images[i].filename);
-                if (object_dets.size() != 0)  
+                load_image(original_img, data.images[i].filename);
+                if (object_dets.size() != 0)
                 {
+                    double original_min_rect_size = min_rect_size;
                     // if shrinking the image would still result in the smallest box being
                     // bigger than the box area threshold then shrink the image.
                     while(min_rect_size/2/2 > source.box_area_thresh())
@@ -447,10 +518,32 @@ namespace dlib
                             r = pyr.rect_down(r);
                         }
                     }
+                    images.push_back(img);
+                    if (aug_rotation_angles.size()) {
+                        for (const auto & angle : aug_rotation_angles) {
+                            rotate_image_inplace(original_img, rotated_image, -angle);
+                            min_rect_size = original_min_rect_size;
+                            // if shrinking the image would still result in the smallest box being
+                            // bigger than the box area threshold then shrink the image.
+                            while(min_rect_size/2/2 > source.box_area_thresh())
+                            {
+                                pyramid_down<2> pyr;
+                                pyr(rotated_image);
+                                min_rect_size *= (1.0/2.0)*(1.0/2.0);
+                            }
+                            while(min_rect_size*(2.0/3.0)*(2.0/3.0) > source.box_area_thresh())
+                            {
+                                pyramid_down<3> pyr;
+                                pyr(rotated_image);
+                                min_rect_size *= (2.0/3.0)*(2.0/3.0);
+                            }
+                            images.push_back(rotated_image);
+                        }
+                    }
                 }
-                images.push_back(img);
-                object_locations.push_back(object_dets);
                 ignored_rects.push_back(ignored);
+
+
             }
         }
 
@@ -466,17 +559,33 @@ namespace dlib
     std::vector<std::vector<rectangle> > load_image_dataset (
         array_type& images,
         std::vector<std::vector<full_object_detection> >& object_locations,
-        const image_dataset_file& source 
+        const image_dataset_file& source,
+        const std::vector<double>& augment_rotations
     )
     {
         std::vector<std::string> parts_list;
-        return load_image_dataset(images, object_locations, source, parts_list);
+        return load_image_dataset(images, object_locations, source, parts_list, augment_rotations);
     }
 
 // ----------------------------------------------------------------------------------------
 
     template <
-        typename array_type 
+        typename array_type
+        >
+    std::vector<std::vector<rectangle> > load_image_dataset (
+        array_type& images,
+        std::vector<std::vector<full_object_detection> >& object_locations,
+        const std::string& filename,
+        const std::vector<double>& augment_rotations
+    )
+    {
+        std::vector<std::string> parts_list;
+        return load_image_dataset(images, object_locations, image_dataset_file(filename), parts_list, augment_rotations);
+    }
+
+
+    template <
+        typename array_type
         >
     std::vector<std::vector<rectangle> > load_image_dataset (
         array_type& images,
@@ -485,12 +594,13 @@ namespace dlib
     )
     {
         std::vector<std::string> parts_list;
-        return load_image_dataset(images, object_locations, image_dataset_file(filename), parts_list);
+        std::vector<double> augment_rotations;
+        return load_image_dataset(images, object_locations, image_dataset_file(filename), parts_list, augment_rotations);
     }
+
 
 // ----------------------------------------------------------------------------------------
 
 }
 
 #endif // DLIB_LOAD_IMAGE_DaTASET_Hh_
-

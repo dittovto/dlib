@@ -4,8 +4,8 @@
     This example program shows how to use dlib's implementation of the paper:
         One Millisecond Face Alignment with an Ensemble of Regression Trees by
         Vahid Kazemi and Josephine Sullivan, CVPR 2014
-    
-    In particular, we will train a face landmarking model based on a small dataset 
+
+    In particular, we will train a face landmarking model based on a small dataset
     and then evaluate it.  If you want to visualize the output of the trained
     model on some images then you can run the face_landmark_detection_ex.cpp
     example program with sp.dat as the input model.
@@ -16,6 +16,9 @@
     landmarking task.
 */
 
+#include <dlib/image_processing/render_face_detections.h>
+#include <dlib/image_processing.h>
+#include <dlib/gui_widgets.h>
 
 #include <dlib/image_processing.h>
 #include <dlib/data_io.h>
@@ -31,7 +34,7 @@ std::vector<std::vector<double> > get_interocular_distances (
 );
 /*!
     ensures
-        - returns an object D such that:    
+        - returns an object D such that:
             - D[i][j] == the distance, in pixels, between the eyes for the face represented
               by objects[i][j].
 !*/
@@ -47,29 +50,29 @@ int main(int argc, char** argv)
         // thing we do is load that dataset.  This means you need to supply the
         // path to this faces folder as a command line argument so we will know
         // where it is.
-        if (argc != 2)
-        {
-            cout << "Give the path to the examples/faces directory as the argument to this" << endl;
-            cout << "program.  For example, if you are in the examples folder then execute " << endl;
-            cout << "this program by running: " << endl;
-            cout << "   ./train_shape_predictor_ex faces" << endl;
-            cout << endl;
-            return 0;
-        }
-        const std::string faces_directory = argv[1];
+        // if (argc != 2)
+        // {
+        //     cout << "Give the path to the examples/faces directory as the argument to this" << endl;
+        //     cout << "program.  For example, if you are in the examples folder then execute " << endl;
+        //     cout << "this program by running: " << endl;
+        //     cout << "   ./train_shape_predictor_ex faces" << endl;
+        //     cout << endl;
+        //     return 0;
+        // }
+        // const std::string faces_directory = argv[1];
         // The faces directory contains a training dataset and a separate
         // testing dataset.  The training data consists of 4 images, each
         // annotated with rectangles that bound each human face along with 68
         // face landmarks on each face.  The idea is to use this training data
         // to learn to identify the position of landmarks on human faces in new
-        // images. 
-        // 
+        // images.
+        //
         // Once you have trained a shape_predictor it is always important to
         // test it on data it wasn't trained on.  Therefore, we will also load
-        // a separate testing set of 5 images.  Once we have a shape_predictor 
+        // a separate testing set of 5 images.  Once we have a shape_predictor
         // created from the training data we will see how well it works by
-        // running it on the testing images. 
-        // 
+        // running it on the testing images.
+        //
         // So here we create the variables that will hold our dataset.
         // images_train will hold the 4 training images and faces_train holds
         // the locations and poses of each face in the training images.  So for
@@ -88,10 +91,33 @@ int main(int argc, char** argv)
         // tool which can be found in the tools/imglab folder.  It is a simple
         // graphical tool for labeling objects in images.  To see how to use it
         // read the tools/imglab/README.txt file.
-        load_image_dataset(images_train, faces_train, faces_directory+"/training_with_face_landmarks.xml");
-        load_image_dataset(images_test, faces_test, faces_directory+"/testing_with_face_landmarks.xml");
+        std::vector<double> augment_rotations = {};
 
-        // Now make the object responsible for training the model.  
+        if (argc > 4) {
+          std::string aug_rot_strings(argv[4]);
+          std::stringstream ss(aug_rot_strings);
+          double num;
+          while (ss >> num) {
+              augment_rotations.push_back(num);
+              if (ss.peek() == ',')
+                  ss.ignore();
+          }
+        }
+
+        load_image_dataset(images_train, faces_train, argv[1], augment_rotations);
+        load_image_dataset(images_test, faces_test, argv[2]);
+
+        // image_window win;
+        // for(size_t i = 0; i < images_train.size(); ++i) {
+        //   if (win.is_closed()) break;
+        //   win.clear_overlay();
+        //   win.set_image(images_train[i]);
+        //   win.add_overlay(faces_train[i][0].get_rect());
+        //   win.add_overlay(render_half_face_detections(faces_train[i][0]));
+        //   cin.get();
+        // }
+
+        // Now make the object responsible for training the model.
         shape_predictor_trainer trainer;
         // This algorithm has a bunch of parameters you can mess with.  The
         // documentation for the shape_predictor_trainer explains all of them.
@@ -101,16 +127,16 @@ int main(int argc, char** argv)
         // have a very small dataset.  In particular, setting the oversampling
         // to a high amount (300) effectively boosts the training set size, so
         // that helps this example.
-        trainer.set_oversampling_amount(300);
+        trainer.set_oversampling_amount(std::stoi(argv[3]));
         // I'm also reducing the capacity of the model by explicitly increasing
         // the regularization (making nu smaller) and by using trees with
-        // smaller depths.  
-        trainer.set_nu(0.05);
-        trainer.set_tree_depth(2);
+        // smaller depths.
+        // trainer.set_nu(0.05);
+        // trainer.set_tree_depth(2);
 
         // some parts of training process can be parallelized.
         // Trainer will use this count of threads when possible
-        trainer.set_num_threads(2);
+        trainer.set_num_threads(8);
 
         // Tell the trainer to print status messages to the console so we can
         // see how long the training will take.
@@ -127,7 +153,7 @@ int main(int argc, char** argv)
         // distances.  Here we are causing the output to scale each face's
         // distances by the interocular distance, as is customary when
         // evaluating face landmarking systems.
-        cout << "mean training error: "<< 
+        cout << "mean training error: "<<
             test_shape_predictor(sp, images_train, faces_train, get_interocular_distances(faces_train)) << endl;
 
         // The real test is to see how well it does on data it wasn't trained
@@ -135,7 +161,7 @@ int main(int argc, char** argv)
         // extremely high, but it's still doing quite good.  Moreover, if you
         // train it on one of the large face landmarking datasets you will
         // obtain state-of-the-art results, as shown in the Kazemi paper.
-        cout << "mean testing error:  "<< 
+        cout << "mean testing error:  "<<
             test_shape_predictor(sp, images_test, faces_test, get_interocular_distances(faces_test)) << endl;
 
         // Finally, we save the model to disk so we can use it later.
@@ -156,19 +182,19 @@ double interocular_distance (
 {
     dlib::vector<double,2> l, r;
     double cnt = 0;
-    // Find the center of the left eye by averaging the points around 
+    // Find the center of the left eye by averaging the points around
     // the eye.
-    for (unsigned long i = 36; i <= 41; ++i) 
+    for (unsigned long i = 36; i <= 41; ++i)
     {
         l += det.part(i);
         ++cnt;
     }
     l /= cnt;
 
-    // Find the center of the right eye by averaging the points around 
+    // Find the center of the right eye by averaging the points around
     // the eye.
     cnt = 0;
-    for (unsigned long i = 42; i <= 47; ++i) 
+    for (unsigned long i = 42; i <= 47; ++i)
     {
         r += det.part(i);
         ++cnt;
@@ -195,4 +221,3 @@ std::vector<std::vector<double> > get_interocular_distances (
 }
 
 // ----------------------------------------------------------------------------------------
-

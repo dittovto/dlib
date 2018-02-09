@@ -41,12 +41,19 @@
         http://dlib.net/files/data/dlib_face_detection_dataset-2016-09-30.tar.gz
 */
 
+#include <opencv2/opencv.hpp>
+#include <dlib/opencv.h>
+// #include <dlib/image_processing/frontal_face_detector.h>
+// #include <dlib/image_processing/render_face_detections.h>
+// #include <dlib/image_processing.h>
+// #include <dlib/gui_widgets.h>
 
 #include <iostream>
 #include <dlib/dnn.h>
 #include <dlib/data_io.h>
 #include <dlib/image_processing.h>
 #include <dlib/gui_widgets.h>
+
 
 
 using namespace std;
@@ -67,6 +74,10 @@ using net_type = loss_mmod<con<1,9,9,1,1,rcon5<rcon5<rcon5<downsampler<input_rgb
 
 int main(int argc, char** argv) try
 {
+    cv::VideoCapture cap(0); // open the default camera
+    if(!cap.isOpened())  // check if we succeeded
+        return -1;
+
     if (argc == 1)
     {
         cout << "Call this program like this:" << endl;
@@ -81,15 +92,22 @@ int main(int argc, char** argv) try
     deserialize(argv[1]) >> net;  
 
     image_window win;
-    for (int i = 2; i < argc; ++i)
+    // for (int i = 2; i < argc; ++i)
+    while (true)
     {
+        // matrix<rgb_pixel> img;
+        // load_image(img, argv[i]);
+        cv::Mat frame;
+        cap >> frame;
+        dlib::cv_image<dlib::bgr_pixel> cv_image(frame);
         matrix<rgb_pixel> img;
-        load_image(img, argv[i]);
+        assign_image(img, cv_image);
+
 
         // Upsampling the image will allow us to detect smaller faces but will cause the
         // program to use more RAM and run longer.
-        while(img.size() < 1800*1800)
-            pyramid_up(img);
+        // while(img.size() < 1800*1800)
+        //     pyramid_up(img);
 
         // Note that you can process a bunch of images in a std::vector at once and it runs
         // much faster, since this will form mini-batches of images and therefore get
@@ -97,13 +115,18 @@ int main(int argc, char** argv) try
         // the same size.  To avoid this requirement on images being the same size we
         // process them individually in this example.
         auto dets = net(img);
+
         win.clear_overlay();
         win.set_image(img);
-        for (auto&& d : dets)
+        for (auto&& d : dets) {
             win.add_overlay(d);
+            cout << "D: "
+                << d.rect.right() - d.rect.left() << ", "
+                << d.rect.bottom() - d.rect.top() << endl;
+        }
 
-        cout << "Hit enter to process the next image." << endl;
-        cin.get();
+        // cout << "Hit enter to process the next image." << endl;
+        // cin.get();
     }
 }
 catch(std::exception& e)
