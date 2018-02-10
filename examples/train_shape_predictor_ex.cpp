@@ -107,15 +107,17 @@ int main(int argc, char** argv)
         load_image_dataset(images_train, faces_train, argv[1], augment_rotations);
         load_image_dataset(images_test, faces_test, argv[2]);
 
-        // image_window win;
-        // for(size_t i = 0; i < images_train.size(); ++i) {
-        //   if (win.is_closed()) break;
-        //   win.clear_overlay();
-        //   win.set_image(images_train[i]);
-        //   win.add_overlay(faces_train[i][0].get_rect());
-        //   win.add_overlay(render_half_face_detections(faces_train[i][0]));
-        //   cin.get();
-        // }
+        image_window win;
+        for(size_t i = 0; i < images_train.size(); ++i) {
+          if (win.is_closed()) break;
+          win.clear_overlay();
+          win.set_image(images_train[i]);
+          win.add_overlay(faces_train[i][0].get_rect());
+          win.add_overlay(render_half_face_detections(faces_train[i][0]));
+          if (cin.get() == 'q') {
+            break;
+          };
+        }
 
         // Now make the object responsible for training the model.
         shape_predictor_trainer trainer;

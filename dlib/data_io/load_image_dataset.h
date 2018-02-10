@@ -18,7 +18,7 @@
 #include <limits>
 #include "../image_transforms/image_pyramid.h"
 #include "../geometry/rectangle.h"
-#include <random>
+
 
 namespace dlib
 {
@@ -355,31 +355,10 @@ namespace dlib
         parts_list.clear();
         images.clear();
         object_locations.clear();
-        assert(augment_rotations.size() == 2 || augment_rotations.size() == 0);
-        int aug_num_samples = 0;
-        double aug_max_angle = 0;
-        std::vector<double> aug_rotation_angles;
-        if (augment_rotations.size()) {
-            aug_num_samples = int(augment_rotations[0]);
-            aug_max_angle = augment_rotations[1] * 3.141592657 / 180.;
-            aug_rotation_angles = std::vector<double>(aug_num_samples * 2, 0);
+        std::vector<double> aug_rotation_angles(augment_rotations);
+        for (auto &angle : aug_rotation_angles) {
+            angle *= 3.14159265 / 180.;
         }
-
-        if (aug_num_samples) {
-            double slice_angle = aug_max_angle / aug_num_samples;
-            for (size_t slice_idx = 0; slice_idx < aug_num_samples; ++slice_idx ) {
-                aug_rotation_angles[slice_idx] = -slice_angle * (aug_num_samples - slice_idx);
-            }
-            for (size_t slice_idx = 0; slice_idx < aug_num_samples; ++slice_idx ) {
-                aug_rotation_angles[aug_num_samples + slice_idx] = slice_angle * (slice_idx + 1);
-            }
-            std::cout << "Sampling Angles: ";
-            for ( const auto & angle : aug_rotation_angles ) {
-                std::cout << angle * 180. / 3.141592657 << ", ";
-            }
-            std::cout << std::endl;
-        }
-
 
         using namespace dlib::image_dataset_metadata;
         dataset data;
@@ -458,8 +437,7 @@ namespace dlib
                         object_locations.push_back(object_dets);
 
 
-                        if (aug_rotation_angles.size()) {
-                            const auto& rect = data.images[i].boxes[j].rect;
+                        if (augment_rotations.size()) {
                             point ctr = dcenter(get_rect(template_img));
                             for (const auto & angle : aug_rotation_angles) {
                                 object_dets.clear();
@@ -469,6 +447,12 @@ namespace dlib
                                 {
                                     rotate_point(ctr, angle, new_partlist[parts_idx[itr->first]]);
                                 }
+
+                                rectangle rect = data.images[i].boxes[j].rect;
+                                // point rect_ctr = dcenter(rect);
+                                // rotate_point(ctr, angle, rect_ctr);
+                                // rect = centered_rect(rect_ctr.x(), rect_ctr.y(), rect.width(), rect.height());
+
                                 object_dets.push_back(full_object_detection(rect, new_partlist));
                                 object_locations.push_back(object_dets);
                             }
@@ -519,7 +503,7 @@ namespace dlib
                         }
                     }
                     images.push_back(img);
-                    if (aug_rotation_angles.size()) {
+                    if (augment_rotations.size()) {
                         for (const auto & angle : aug_rotation_angles) {
                             rotate_image_inplace(original_img, rotated_image, -angle);
                             min_rect_size = original_min_rect_size;
