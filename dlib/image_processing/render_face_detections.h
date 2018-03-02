@@ -101,9 +101,9 @@ namespace dlib
         std::vector<image_window::overlay_line> lines;
         for (unsigned long i = 0; i < dets.size(); ++i)
         {
-            DLIB_CASSERT(dets[i].num_parts() == 39 || dets[i].num_parts() == 5,
+            DLIB_CASSERT(dets[i].num_parts() == 44 || dets[i].num_parts() == 5,
                 "\t std::vector<image_window::overlay_line> render_half_face_detections()"
-                << "\n\t You have to give either a 5 point or 39 point face landmarking output to this function. "
+                << "\n\t You have to give either a 5 point or 40 point face landmarking output to this function. "
                 << "\n\t dets["<<i<<"].num_parts():  " << dets[i].num_parts() 
             );
 
@@ -157,6 +157,9 @@ namespace dlib
                 for (unsigned long i = 37; i < 38; ++i)
                     lines.push_back(image_window::overlay_line(d.part(i), d.part(i+1), color));
                 lines.push_back(image_window::overlay_line(d.part(38), d.part(34), color));
+
+                for (unsigned long i = 39; i < 43; ++i)
+                    lines.push_back(image_window::overlay_line(d.part(i), d.part(i+1), color));
             }
         }
         return lines;

@@ -251,6 +251,7 @@ namespace dlib
 
                         if (atts.is_in_list("file")) temp_image.filename = atts["file"];
                         else throw dlib::error("<image> missing required attribute 'file'");
+                        if (atts.is_in_list("mirrored")) temp_image.mirrored = sa = atts["mirrored"];
                     }
 
                     ts.push_back(name);

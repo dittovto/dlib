@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
         cout << "Face Index: " << face_detector_index;
         cout << ", Score: " << face_score;
         cout << ", BBox Size: (" << face.width() << ", " << face.height() << ")" << std::endl;
-        if (face_score < 1.7) {
+        if (face_score < 2.0) {
           use_detector = face_detector_index;
         } else {
           use_detector = 0;

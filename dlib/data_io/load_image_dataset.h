@@ -403,7 +403,6 @@ namespace dlib
         image_type img, original_img, rotated_image;
         image_type template_img;
         std::vector<full_object_detection> object_dets;
-        load_image(template_img, data.images[0].filename);
 
         for (unsigned long i = 0; i < data.images.size(); ++i)
         {
@@ -411,6 +410,7 @@ namespace dlib
             object_dets.clear();
             ignored.clear();
             assert(data.images[i].boxes.size() == 1);
+            load_image(img, data.images[i].filename);
             for (unsigned long j = 0; j < data.images[i].boxes.size(); ++j)
             {
                 if (source.should_load_box(data.images[i].boxes[j]))
@@ -432,15 +432,22 @@ namespace dlib
                         }
 
                         object_dets.clear();
-                        object_dets.push_back(full_object_detection(data.images[i].boxes[j].rect, partlist));
+                        rectangle cur_rect = data.images[i].boxes[j].rect;
+                        object_dets.push_back(full_object_detection(cur_rect, partlist));
+                        // if (augment_rotations.size()) {
+                        //     point rect_ctr = dcenter(cur_rect);
+                        //     rectangle left_rect = centered_rect(rect_ctr.x() - 10, rect_ctr.y(), cur_rect.width(), cur_rect.height());
+                        //     rectangle right_rect = centered_rect(rect_ctr.x() + 10, rect_ctr.y(), cur_rect.width(), cur_rect.height());
+                        //     object_dets.push_back(full_object_detection(left_rect, partlist));
+                        //     object_dets.push_back(full_object_detection(right_rect, partlist));
+                        // }
                         min_rect_size = std::min<double>(min_rect_size, object_dets.back().get_rect().area());
                         object_locations.push_back(object_dets);
 
 
                         if (augment_rotations.size()) {
-                            point ctr = dcenter(get_rect(template_img));
+                            point ctr = dcenter(get_rect(img));
                             for (const auto & angle : aug_rotation_angles) {
-                                object_dets.clear();
                                 std::vector<point> new_partlist(partlist);
 
                                 for (itr = parts.begin(); itr != parts.end(); ++itr)
@@ -453,6 +460,7 @@ namespace dlib
                                 // rotate_point(ctr, angle, rect_ctr);
                                 // rect = centered_rect(rect_ctr.x(), rect_ctr.y(), rect.width(), rect.height());
 
+                                object_dets.clear();
                                 object_dets.push_back(full_object_detection(rect, new_partlist));
                                 object_locations.push_back(object_dets);
                             }
@@ -463,8 +471,13 @@ namespace dlib
 
             if (!source.should_skip_empty_images() || object_dets.size() != 0)
             {
-                load_image(img, data.images[i].filename);
                 load_image(original_img, data.images[i].filename);
+                if (data.images[i].mirrored) {
+                    flip_image_left_right(img);
+                    flip_image_left_right(original_img);
+                    std::cout << data.images[i].filename << " is mirrored." << std::endl;
+                }
+
                 if (object_dets.size() != 0)
                 {
                     double original_min_rect_size = min_rect_size;

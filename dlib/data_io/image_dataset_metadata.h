@@ -104,11 +104,12 @@ namespace dlib
                     This object represents an annotated image.   
             !*/
 
-            image() {}
-            image(const std::string& f) : filename(f) {}
+            image() : mirrored(false) {}
+            image(const std::string& f) : filename(f), mirrored(false) {}
 
             std::string filename;
             std::vector<box> boxes;
+            bool mirrored;
         };
 
     // ------------------------------------------------------------------------------------
