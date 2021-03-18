@@ -26,12 +26,16 @@ def BUILD_CONFIGS = [
         'apt_prod_repo' : '3rdparty-16.04',
         'apt_test_repo' : '3rdparty-16.04-staging',
         'dist'          : 'xenial',
+        'nexus_prod'    : 'ditto-xenial-release',
+        'nexus_test'    : 'ditto-xenial-testing',
     ],
     'ubuntu-14-04' : [
         'docker_file'   : 'Dockerfile.trusty',
         'apt_prod_repo' : '3rdparty-14.04',
         'apt_test_repo' : '3rdparty-14.04-staging',
         'dist'          : 'trusty',
+        'nexus_prod'    : '',
+        'nexus_test'    : '',
     ]
 ]
 
@@ -64,7 +68,8 @@ node('static-minion') {
         ditto_deb.buildInsideDocker(image_name, build_config.docker_file)
         ditto_deb.generatePackageInsideDocker(image_name, version, revision)
         ditto_deb.publishPackageToS3(build_config.apt_test_repo,
-                                     build_config.dist)
+                                     build_config.dist,
+                                     build_config.nexus_test)
       }
 
       stage("Installing from ${platform} repo and test") {
@@ -104,11 +109,19 @@ node('static-minion') {
 
         image_name =
           ditto_utils.buildDockerImageName(git_info.repo_name, platform)
-        apt_repo_to_publish = deploy_mode == "RC" ?
-          build_config.apt_test_repo : build_config.apt_prod_repo
+        if (deploy_mode == "RC") {
+          apt_repo_to_publish = build_config.apt_test_repo
+          nexus_repo_to_publish = build_config.nexus_test
+        } else {
+          apt_repo_to_publish = build_config.apt_prod_repo
+          nexus_repo_to_publish = build_config.nexus_prod
+        }
 
         ditto_deb.generatePackageInsideDocker(image_name, version, revision)
-        ditto_deb.publishPackageToS3(apt_repo_to_publish, build_config.dist)
+        ditto_deb.publishPackageToS3(
+          apt_repo_to_publish,
+          build_config.dist,
+          nexus_repo_to_publish)
       }
     }
 
