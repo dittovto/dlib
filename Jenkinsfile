@@ -21,6 +21,14 @@ properties([[
 def GIT_CREDENTIALS_ID = 'dittovto-buildbot'
 
 def BUILD_CONFIGS = [
+    'ubuntu-18-04' : [
+        'docker_file'   : 'Dockerfile.bionic',
+        'apt_prod_repo' : '-',
+        'apt_test_repo' : '-',
+        'dist'          : '-',
+        'nexus_prod'    : 'ditto-bionic-release',
+        'nexus_test'    : 'ditto-bionic-testing',
+    ],
     'ubuntu-16-04' : [
         'docker_file'   : 'Dockerfile.xenial',
         'apt_prod_repo' : '3rdparty-16.04',
