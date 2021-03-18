@@ -16,7 +16,7 @@ properties([[
   ]
 ]]);
 
-@Library('jenkins-shared-library@release/v1.1') _
+@Library('jenkins-shared-library@ubuntu-20.04') _
 
 def GIT_CREDENTIALS_ID = 'dittovto-buildbot'
 
