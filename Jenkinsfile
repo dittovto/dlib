@@ -37,7 +37,7 @@ def BUILD_CONFIGS = [
 
 def FIRST_PLATFORM = (BUILD_CONFIGS.keySet() as List).sort()[0]
 
-node('build && docker') {
+node('static-minion') {
   BUILD_CONFIGS.each { platform, build_config ->
     dir(platform) {
       stage("Checking out ${platform}") {
@@ -88,7 +88,7 @@ stage("Tag and deploy?") {
   }
 }
 
-node('build && docker') {
+node('static-minion') {
   stage("Building and publishing to rc or release") {
     if (!(deploy_mode == "RC" || deploy_mode == "RELEASE")) return;
 
