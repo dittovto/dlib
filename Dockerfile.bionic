@@ -10,11 +10,8 @@ RUN apt-get update -qq && apt-get install -y \
 	build-essential \
 	cmake \
 	git \
-	libavcodec-dev \
-	libavformat-dev \
 	libgflags-dev \
 	libgtk2.0-dev \
-	libswscale-dev \
 	pkg-config \
 	wget
 
@@ -30,7 +27,6 @@ RUN apt-get update -qq && apt-get install -y \
 	libjpeg-dev \
 	libpng-dev \
 	libtiff-dev \
-	libdc1394-22-dev \
 	python-dev \
 	python-numpy
 
